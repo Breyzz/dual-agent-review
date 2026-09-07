@@ -69,16 +69,19 @@ def save_output(out_dir: str, task_name: str, model_name: str, content: str) -> 
 
 
 def run(prompt: str, task_name: str, out_dir: str) -> None:
+    # Each CLI call is a fresh, one-off conversation — a single-item history.
+    messages = [{"role": "user", "content": prompt}]
+
     print("Calling Claude...")
     try:
-        claude_out = call_claude(prompt)
+        claude_out = call_claude(messages)
         print(f"Saved: {save_output(out_dir, task_name, 'claude', claude_out)}")
     except Exception as e:
         print(f"Claude call failed: {e}", file=sys.stderr)
 
     print("Calling GPT...")
     try:
-        gpt_out = call_gpt(prompt)
+        gpt_out = call_gpt(messages)
         print(f"Saved: {save_output(out_dir, task_name, 'gpt', gpt_out)}")
     except Exception as e:
         print(f"GPT call failed: {e}", file=sys.stderr)
