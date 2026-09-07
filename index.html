@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two-Model Chat</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --panel: #ffffff;
+    --border: #e2e2e5;
+    --text: #1a1a1a;
+    --muted: #6b6b70;
+    --claude-accent: #cc785c;
+    --gpt-accent: #10a37f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header h1 { font-size: 16px; margin: 0; }
+  #reset-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  #reset-btn:hover { background: var(--bg); }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .turn { margin-bottom: 24px; }
+  .user-msg {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    white-space: pre-wrap;
+  }
+  .replies {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .reply {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: var(--panel);
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .reply .label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .reply.claude .label { color: var(--claude-accent); }
+  .reply.gpt .label { color: var(--gpt-accent); }
+  .reply.pending { color: var(--muted); font-style: italic; }
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    padding: 14px 20px;
+  }
+  #input-row {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    gap: 8px;
+  }
+  #input-row textarea {
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    height: 44px;
+  }
+  #input-row button {
+    border: none;
+    background: #1a1a1a;
+    color: white;
+    border-radius: 8px;
+    padding: 0 20px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #input-row button:disabled {
+    background: var(--muted);
+    cursor: not-allowed;
+  }
+  @media (max-width: 600px) {
+    .replies { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Two-Model Chat</h1>
+    <button id="reset-btn">New chat</button>
+  </header>
+  <div id="messages"></div>
+  <footer>
+    <div id="input-row">
+      <textarea id="input" placeholder="Ask something..." rows="1"></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+  </footer>
+
+<script>
+const messagesEl = document.getElementById("messages");
+const inputEl = document.getElementById("input");
+const sendBtn = document.getElementById("send-btn");
+const resetBtn = document.getElementById("reset-btn");
+
+function addTurn(userText) {
+  const turn = document.createElement("div");
+  turn.className = "turn";
+  turn.innerHTML = `
+    <div class="user-msg"></div>
+    <div class="replies">
+      <div class="reply claude pending"><span class="label">Claude</span>Thinking...</div>
+      <div class="reply gpt pending"><span class="label">GPT</span>Thinking...</div>
+    </div>
+  `;
+  turn.querySelector(".user-msg").textContent = userText;
+  messagesEl.appendChild(turn);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return turn;
+}
+
+function fillReply(turn, which, text) {
+  const el = turn.querySelector(`.reply.${which}`);
+  el.classList.remove("pending");
+  el.innerHTML = `<span class="label">${which === "claude" ? "Claude" : "GPT"}</span>`;
+  el.appendChild(document.createTextNode(text));
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function send() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+  inputEl.value = "";
+  // Disabling input while a request is in flight isn't just UX polish here:
+  // the server holds one shared conversation with no per-request locking,
+  // so overlapping requests could interleave and corrupt both histories.
+  inputEl.disabled = true;
+  sendBtn.disabled = true;
+
+  const turn = addTurn(text);
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    fillReply(turn, "claude", data.claude);
+    fillReply(turn, "gpt", data.gpt);
+  } catch (err) {
+    fillReply(turn, "claude", `[request failed: ${err.message}]`);
+    fillReply(turn, "gpt", `[request failed: ${err.message}]`);
+  } finally {
+    inputEl.disabled = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}
+
+sendBtn.addEventListener("click", send);
+inputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+
+resetBtn.addEventListener("click", async () => {
+  await fetch("/api/reset", { method: "POST" });
+  messagesEl.innerHTML = "";
+});
+</script>
+</body>
+</html>
