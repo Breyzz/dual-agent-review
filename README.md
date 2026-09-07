@@ -7,7 +7,7 @@ Mainly used for privacy since it goes to these two APIs and no third-party and t
 ```
 git clone <your-repo-url>
 cd dual-agent-review
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
