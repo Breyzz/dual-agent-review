@@ -22,7 +22,8 @@ DEFAULT_GPT_MODEL = os.environ.get("GPT_MODEL", "gpt-5")
 MAX_TOKENS = 4096
 
 
-def call_claude(prompt: str, model: str = DEFAULT_CLAUDE_MODEL) -> str:
+def call_claude(messages: list[dict], model: str = DEFAULT_CLAUDE_MODEL) -> str:
+    """messages: [{"role": "user"|"assistant", "content": str}, ...], oldest first."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise RuntimeError(
@@ -32,12 +33,13 @@ def call_claude(prompt: str, model: str = DEFAULT_CLAUDE_MODEL) -> str:
     response = client.messages.create(
         model=model,
         max_tokens=MAX_TOKENS,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
     )
     return response.content[0].text
 
 
-def call_gpt(prompt: str, model: str = DEFAULT_GPT_MODEL) -> str:
+def call_gpt(messages: list[dict], model: str = DEFAULT_GPT_MODEL) -> str:
+    """messages: [{"role": "user"|"assistant", "content": str}, ...], oldest first."""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError(
@@ -46,6 +48,6 @@ def call_gpt(prompt: str, model: str = DEFAULT_GPT_MODEL) -> str:
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
     )
     return response.choices[0].message.content
