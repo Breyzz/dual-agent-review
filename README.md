@@ -16,11 +16,17 @@ cp .env.example .env
 Usage:
 
 Review uncommitted changes in the current repo:
-1. python agent.py review
+```python agent.py review```
 
 Review a specific repo, or a branch diff instead of working-tree changes:  
-2. python agent.py review --path ../other-repo
-   python agent.py review --against main
+```
+python agent.py review --path ../other-repo
+python agent.py review --against main
+```
 
 Ask a research question:
-3. python agent.py ask "What are the tradeoffs between event sourcing and CRUD for this kind of system?"
+```python agent.py ask "What are the tradeoffs between event sourcing and CRUD for this kind of system?"```
+
+Or use the chat UI:
+```python server.py```
+Then open http://127.0.0.1:8000. Ask something, and both Claude and GPT reply side by side.
